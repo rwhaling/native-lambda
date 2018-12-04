@@ -57,6 +57,7 @@ object Curl {
   val GET = 80
   val POST = 47
   val PUT = 54
+  val RESPONSE_CODE = 0x200000 + 2
   val CONTENTLENGTHDOWNLOADT = 0x300000 + 15
 
   var body = ""
@@ -67,7 +68,7 @@ object Curl {
     val new_data = stdlib.realloc(!data._1, !data._2 + (size * nmemb) + 1)
     !data._1 = new_data
     // println(easy_getinfo(data.cast[Ptr[Byte]], CONTENTLENGTHDOWNLOADT, len))
-    // println(s"got data of size ${size} x ${nmemb}: ${fromCString(ptr)}")
+    println(s"got data of size ${size} x ${nmemb}: ${fromCString(ptr)}")
     body = body + fromCString(ptr).trim()
     return size * nmemb
   }
@@ -77,12 +78,20 @@ object Curl {
     println(s"got header line of size ${byteSize}: ${fromCString(ptr)}")
     // fwrite(ptr, size, nmemb, stdout)
     val headerString = fromCString(ptr)
-    if (headerString.contains(": ")) {
-      val pair = headerString.trim.split(": ") match {
-        case Array(k,v) => k -> v
-      }
-      headers = headers :+ pair
+    val length = headerString.size
+    val colonPos = headerString.indexOf(": ")
+    if (colonPos >= 0) {
+      val key = headerString.substring(0,colonPos)
+      val value = headerString.substring(colonPos + 2,length).trim
+      println(s"$key -> $value")
+      headers = headers :+ (key, value)
     }
+    // if (headerString.contains(": ")) {
+    //   val pair = headerString.trim.split(": ") match {
+    //     case Array(k,v) => k -> v
+    //   }
+    //   headers = headers :+ pair
+    // }
     return byteSize
   }
 
@@ -91,7 +100,7 @@ object Curl {
 
   var serial = 0L
 
-  def get(url:String):(Int,Map[String,String],String) = Zone { implicit z => 
+  def get(url:String):(Long,Map[String,String],String) = Zone { implicit z => 
     val reqId = serial
     serial += 1
     val handle = LibCurl.easy_init()
@@ -106,6 +115,10 @@ object Curl {
     !headerbuffer_struct._2 = 1
     !headerbuffer_struct._3 = reqId
 
+    body = ""
+    headers = Seq[(String,String)]()
+
+
     LibCurl.easy_setopt(handle, URL,toCString(url))
     LibCurl.easy_setopt(handle, WRITECALLBACK, writeCB)
     LibCurl.easy_setopt(handle, WRITEDATA, readbuffer_struct)
@@ -114,13 +127,16 @@ object Curl {
 
 
     val r = LibCurl.easy_perform(handle)
+    val code = stackalloc[Long]
+    LibCurl.easy_getinfo(handle, RESPONSE_CODE, code);
+    LibCurl.easy_cleanup(handle)
     val headerMap = headers.toMap
-    println(s"headers: $headerMap")
+    // println(s"headers: $headerMap")
 
-    (200, headerMap, body)
+    (!code, headerMap, body)
   }
 
-  def post(url:String, data:String):(Int,Map[String,String],String) = Zone { implicit z => 
+  def post(url:String, data:String):(Long,Map[String,String],String) = Zone { implicit z => 
     val reqId = serial
     serial += 1
     val handle = LibCurl.easy_init()
@@ -137,6 +153,10 @@ object Curl {
 
     val dataBytes = toCString(data)
 
+    body = ""
+    headers = Seq[(String,String)]()
+
+
     LibCurl.easy_setopt(handle, URL,toCString(url))
     LibCurl.easy_setopt(handle, WRITECALLBACK, writeCB)
     LibCurl.easy_setopt(handle, WRITEDATA, readbuffer_struct)
@@ -145,9 +165,14 @@ object Curl {
     LibCurl.easy_setopt(handle, POSTFIELDS, dataBytes);
  
     val r = LibCurl.easy_perform(handle)
-    val headerMap = headers.toMap
-    println(s"headers: $headerMap")
 
-    (200, headerMap, body)
+    val code = stackalloc[Long]
+
+    LibCurl.easy_getinfo(handle, RESPONSE_CODE, code);
+    println(s"post returned $r, code: ${!code}")
+    val headerMap = headers.toMap
+    // println(s"headers: $headerMap")
+
+    (!code, headerMap, body)
   }
 }

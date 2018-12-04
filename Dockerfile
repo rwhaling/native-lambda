@@ -1,4 +1,4 @@
-FROM amazonlinux:2017.03-with-sources
+FROM amazonlinux:latest
 ENV SCALA_VERSION="2.11.12"
 WORKDIR /build/
 
@@ -44,9 +44,9 @@ repo_gpgcheck=0 \n\
 enabled=1 \n\
 enabled_metadata=1' >> /etc/yum.repos.d/epel.repo
 RUN yum install -y clang-3.9.0
-RUN yum install -y llvm-3.9.0 llvm-3.9.0-devel llvm-3.9.0-libs
+RUN yum install -y llvm-3.9.0 llvm-3.9.0-devel
 RUN yum install -y zip which libunwind libunwind-devel python-pip jq libcurl-devel
-RUN python-pip install awscli
+RUN pip install awscli
 RUN mkdir -p /build/runtime/lib/ && cp /usr/lib64/libunwind.so /build/runtime/lib/libunwind.so.8 && cp /usr/lib64/libunwind-x86_64.so.8 /build/runtime/lib/libunwind-x86_64.so.8
 ADD bootstrap /build/runtime/
 
@@ -56,9 +56,9 @@ ADD bootstrap /build/runtime/
 
 # RUN STTP_NATIVE=1 sbt "++ 2.11.12! publishLocal"
 
-RUN yum install -y re2-devel
-RUN cp /usr/lib64/libre2.so.0 /build/runtime/libre2.so.0
-RUN ls -al /usr/lib64/
+# RUN yum install -y re2-devel
+# RUN cp /usr/lib64/libre2.so.0 /build/runtime/libre2.so.0
+# RUN ls -al /usr/lib64/
 
 # RUN yum install -y git make
 
@@ -75,7 +75,8 @@ RUN ls -al /usr/lib64/
 # RUN cp /usr/lib64/libstdc++.so.6 /build/runtime/lib/libstdc++.so.6
 # RUN cp /usr/lib64/libc.so.6 /build/runtime/lib/libc.so.6
 WORKDIR /build/runtime/
-RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0
+RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8
+# RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0
 # RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0 lib/libstdc++.so.6 lib/libc.so.6
 
 WORKDIR /build/main/
@@ -84,6 +85,7 @@ ADD build.sbt *.scala scripts/init.sh scripts/update.sh scripts/delete.sh script
 
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" 
+# RUN yum install glibc-devel
 RUN sbt nativeLink
 
 RUN zip function.zip target/scala-2.11/main-out 
