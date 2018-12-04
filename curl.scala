@@ -1,4 +1,5 @@
 import scalanative.native._
+// import re2s._
 
 @link("curl")
 @extern object LibCurl {
@@ -64,6 +65,11 @@ object Curl {
 
   var headers = Seq[(String,String)]()
 
+  // val pattern = Pattern.compile(": ")
+  // pattern.split("a: b")
+  "a: b".split(": ")
+
+
   def writeData(ptr: Ptr[Byte], size: CSize, nmemb: CSize, data: Ptr[CurlBuffer]): CSize = {
     val new_data = stdlib.realloc(!data._1, !data._2 + (size * nmemb) + 1)
     !data._1 = new_data
@@ -78,20 +84,12 @@ object Curl {
     println(s"got header line of size ${byteSize}: ${fromCString(ptr)}")
     // fwrite(ptr, size, nmemb, stdout)
     val headerString = fromCString(ptr)
-    val length = headerString.size
-    val colonPos = headerString.indexOf(": ")
-    if (colonPos >= 0) {
-      val key = headerString.substring(0,colonPos)
-      val value = headerString.substring(colonPos + 2,length).trim
-      println(s"$key -> $value")
-      headers = headers :+ (key, value)
+    if (headerString.contains(": ")) {
+      val pair = headerString.trim.split(": ") match {
+        case Array(k,v) => k -> v
+      }
+      headers = headers :+ pair
     }
-    // if (headerString.contains(": ")) {
-    //   val pair = headerString.trim.split(": ") match {
-    //     case Array(k,v) => k -> v
-    //   }
-    //   headers = headers :+ pair
-    // }
     return byteSize
   }
 
@@ -118,13 +116,11 @@ object Curl {
     body = ""
     headers = Seq[(String,String)]()
 
-
     LibCurl.easy_setopt(handle, URL,toCString(url))
     LibCurl.easy_setopt(handle, WRITECALLBACK, writeCB)
     LibCurl.easy_setopt(handle, WRITEDATA, readbuffer_struct)
     LibCurl.easy_setopt(handle, HEADERCALLBACK, headerCB)
     LibCurl.easy_setopt(handle, HEADERDATA, headerbuffer_struct)
-
 
     val r = LibCurl.easy_perform(handle)
     val code = stackalloc[Long]
@@ -155,7 +151,6 @@ object Curl {
 
     body = ""
     headers = Seq[(String,String)]()
-
 
     LibCurl.easy_setopt(handle, URL,toCString(url))
     LibCurl.easy_setopt(handle, WRITECALLBACK, writeCB)

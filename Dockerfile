@@ -60,23 +60,23 @@ ADD bootstrap /build/runtime/
 # RUN cp /usr/lib64/libre2.so.0 /build/runtime/libre2.so.0
 # RUN ls -al /usr/lib64/
 
-# RUN yum install -y git make
+RUN yum install -y git make
 
-# RUN git clone https://github.com/google/re2.git
+RUN git clone https://github.com/google/re2.git
 
-# WORKDIR /build/runtime/re2/
+WORKDIR /build/runtime/re2/
 
-# ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-# ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" CXX=/opt/llvm-3.9.0/bin/clang++ CPATH="/opt/llvm-3.9.0/lib64/clang/3.9.0/include:${CPATH}" 
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" CXX=/opt/llvm-3.9.0/bin/clang++ LDFLAGS="-static-libstdc++"
 # # RUN yum install -y libcxx
-# RUN make && make install
-# RUN cp /usr/local/lib/libre2.so.0 /build/runtime/lib/libre2.so.0
+RUN make && make install
+RUN cp /usr/local/lib/libre2.so.0 /build/runtime/lib/libre2.so.0
 
 # RUN cp /usr/lib64/libstdc++.so.6 /build/runtime/lib/libstdc++.so.6
 # RUN cp /usr/lib64/libc.so.6 /build/runtime/lib/libc.so.6
 WORKDIR /build/runtime/
-RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8
-# RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0
+# RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8
+RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0
 # RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0 lib/libstdc++.so.6 lib/libc.so.6
 
 WORKDIR /build/main/
