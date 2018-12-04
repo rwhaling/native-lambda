@@ -1,5 +1,4 @@
 import scalanative.native._
-// import re2s._
 
 @link("curl")
 @extern object LibCurl {
@@ -64,11 +63,6 @@ object Curl {
   var body = ""
 
   var headers = Seq[(String,String)]()
-
-  // val pattern = Pattern.compile(": ")
-  // pattern.split("a: b")
-  "a: b".split(": ")
-
 
   def writeData(ptr: Ptr[Byte], size: CSize, nmemb: CSize, data: Ptr[CurlBuffer]): CSize = {
     val new_data = stdlib.realloc(!data._1, !data._2 + (size * nmemb) + 1)
