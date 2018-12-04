@@ -1,4 +1,4 @@
-FROM amazonlinux
+FROM amazonlinux:2017.03-with-sources
 ENV SCALA_VERSION="2.11.12"
 WORKDIR /build/
 
@@ -32,6 +32,7 @@ RUN yum-config-manager --enable epel > /dev/null
 RUN yum -y update
 RUN yum -y group install "development tools"
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+# sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 RUN echo $'[alonid-llvm-3.9.0] \n\
 name=Copr repo for llvm-3.9.0 owned by alonid \n\
 baseurl=https://copr-be.cloud.fedoraproject.org/results/alonid/llvm-3.9.0/epel-7-$basearch/ \n\
@@ -43,24 +44,48 @@ repo_gpgcheck=0 \n\
 enabled=1 \n\
 enabled_metadata=1' >> /etc/yum.repos.d/epel.repo
 RUN yum install -y clang-3.9.0
-RUN yum install -y llvm-3.9.0
-RUN yum install -y zip which libunwind libunwind-devel python-pip jq
-RUN pip install awscli
+RUN yum install -y llvm-3.9.0 llvm-3.9.0-devel llvm-3.9.0-libs
+RUN yum install -y zip which libunwind libunwind-devel python-pip jq libcurl-devel
+RUN python-pip install awscli
 RUN mkdir -p /build/runtime/lib/ && cp /usr/lib64/libunwind.so /build/runtime/lib/libunwind.so.8 && cp /usr/lib64/libunwind-x86_64.so.8 /build/runtime/lib/libunwind-x86_64.so.8
 ADD bootstrap /build/runtime/
 
-RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8
+# WORKDIR /build/sttp/
 
-ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" CPATH="/opt/opt/llvm-3.9.0/include:${CPATH}"
+# RUN git clone https://github.com/softwaremill/sttp.git
+
+# RUN STTP_NATIVE=1 sbt "++ 2.11.12! publishLocal"
+
+RUN yum install -y re2-devel
+RUN cp /usr/lib64/libre2.so.0 /build/runtime/libre2.so.0
+RUN ls -al /usr/lib64/
+
+# RUN yum install -y git make
+
+# RUN git clone https://github.com/google/re2.git
+
+# WORKDIR /build/runtime/re2/
+
+# ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+# ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" CXX=/opt/llvm-3.9.0/bin/clang++ CPATH="/opt/llvm-3.9.0/lib64/clang/3.9.0/include:${CPATH}" 
+# # RUN yum install -y libcxx
+# RUN make && make install
+# RUN cp /usr/local/lib/libre2.so.0 /build/runtime/lib/libre2.so.0
+
+# RUN cp /usr/lib64/libstdc++.so.6 /build/runtime/lib/libstdc++.so.6
+# RUN cp /usr/lib64/libc.so.6 /build/runtime/lib/libc.so.6
+WORKDIR /build/runtime/
+RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0
+# RUN zip runtime.zip bootstrap lib/libunwind.so.8 lib/libunwind-x86_64.so.8 lib/libre2.so.0 lib/libstdc++.so.6 lib/libc.so.6
 
 WORKDIR /build/main/
-
 ADD project/build.properties project/plugin.sbt /build/main/project/
-ADD build.sbt main.scala scripts/init.sh scripts/update.sh scripts/delete.sh scripts/invoke.sh /build/main/
+ADD build.sbt *.scala scripts/init.sh scripts/update.sh scripts/delete.sh scripts/invoke.sh /build/main/
 
-RUN sbt compile
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV PATH="/opt/llvm-3.9.0/bin:${PATH}" 
 RUN sbt nativeLink
-# ADD function.sh function.sh 
+
 RUN zip function.zip target/scala-2.11/main-out 
 
 ENV FUNCTION_NAME=native_test RUNTIME_NAME=native_test_runtime
