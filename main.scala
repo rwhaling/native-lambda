@@ -17,26 +17,25 @@ object main {
     val runtimeApi = System.getenv("AWS_LAMBDA_RUNTIME_API")
     println(s"Runtime API endpoint: $runtimeApi")
     while (true) {
+      val poll_resp = sttp.get(uri"http://${runtimeApi}/2018-06-01/runtime/invocation/next").send()
+      println(s"${poll_resp.code} ${poll_resp.headers}")
+      val requestId = poll_resp.headers("Lambda-Runtime-Aws-Request-Id")
+      val eventData:String = poll_resp.unsafeBody
 
-      val (code, headers, eventData) = Curl.get(s"http://${runtimeApi}/2018-06-01/runtime/invocation/next")
-      // need to find a newer libcurl before sttp will work
-      // val resp = sttp.get(uri"https://postman-echo.com/get?foo1=bar1&foo2=bar2").send()
-
-      println(headers)
-      val requestId = headers("Lambda-Runtime-Aws-Request-Id")
       val parsed = Parse.decodeOption[TestEvent](eventData)
       println(s"parsed: ${parsed}")
-      val response = handle(parsed,headers)
+
+      val response = handle(parsed,poll_resp.headers.toMap)
       println(response)
-      val respUrl = s"http://${runtimeApi}/2018-06-01/runtime/invocation/${requestId}/response"
-      println(s"resp Url: '$respUrl'")
-      val (postcode, postheaders, postresponse) = Curl.post(s"http://${runtimeApi}/2018-06-01/runtime/invocation/${requestId}/response", response)
-      println(s"GOT POST RESPONSE: ${postresponse}")
+      val respUrl = uri"http://${runtimeApi}/2018-06-01/runtime/invocation/${requestId}/response"
+      println(s"resp Url: '${respUrl.toString}'")
+      val result_resp = sttp.post(respUrl).body(response).send()
+      println(s"GOT POST RESPONSE: ${result_resp.code}")
     }
   }
 
   def handle[T](eventData:T, headers:Map[String,String]):String = {
     val requestId = headers("Lambda-Runtime-Aws-Request-Id")
-    s"GOT REQUESTID ${requestId} with event data: ${eventData}"
+    s"GOT REQUEST ${requestId} with event data: \n${eventData}\n"
   }
 }

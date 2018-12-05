@@ -7,7 +7,8 @@ echo "INITIALIZING: LAMBDA_TASK_ROOT: $LAMBDA_TASK_ROOT _HANDLER: $_HANDLER pwd:
 # source $LAMBDA_TASK_ROOT/"$(echo $_HANDLER | cut -d. -f1).sh"
 echo $(cat /etc/os-release)
 
-echo $(ls -al /usr/lib64)
+echo $(ls -al /lib64)
+echo "OPT LIB: $(ls -al /opt/lib)"
 
 export LD_LIBRARY_PATH="/var/task/lib:/opt/lib:${LD_LIBRARY_PATH}"
 
