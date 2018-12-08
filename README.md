@@ -3,11 +3,27 @@
 A running, proof-of-concept port of the [Custom Runtime Tutorial](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-walkthrough.html) to Scala Native, with a few bonus goodies.  The code is about 40 lines of Scala, and nothing especially low-level; I implemented the API interactions with Paweł Cejrowski's excellent [Curl backend for STTP](https://github.com/softwaremill/sttp/tree/master/core/native/src/main/scala/com/softwaremill/sttp).  
 
 The tricky part is the build: custom Lambda runtimes execute on a somewhat cranky [Amazon Linux machine image](https://docs.aws.amazon.com/lambda/latest/dg/current-supported-versions.html), with outdated versions of several critical libraries, including critical ones like LLVM, curl, and openssl.
-To construct a working Scala Native image, I use Docker to build custom versions of the required libraries, publish those as a [Lambda Layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), and then do a bit of linking trickery to ensure that the function binary will find the packaged libaries once it's installed on the Lambda server.  You can check out the [Dockerfile](Dockerfile) for the bloody details.
+To construct a working Scala Native image, I use Docker to build custom versions of the required libraries, publish those as a [Lambda Layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), and then do a bit of linking trickery to ensure that the function binary will find the packaged libaries once it's installed on the Lambda server.  
+
+There are two Dockerfiles: [one for the base image](native-lambda-base/Dockerfile) for the base image, which I have published at `rwhaling/native-lambda-base`, but can be rebuilt locally if you prefer, and [one for compiling and linking your code](Dockerfile), which is much simpler. 
 
 Extras: I've included Argonaut in the libary for JSON serialization, and  openssl for future applications (see below).
 
 Caveat: I'm not responsible for any AWS costs you may invoke by using this software - this is all intended to fit well within the free tier but please review AWS' pricing policies before attempting to deploy this software.
+
+## API Example
+
+```scala
+object Main {
+  def main(args:Array[String]) {
+    println("Hello serverless world\n")
+    NativeLambda.serve[TestEvent,TestResult] { (event, headers) =>
+      val requestId = headers("Lambda-Runtime-Aws-Request-Id")
+      TestResult(s"GOT REQUEST ${requestId} with event data: ${event}")
+    }
+  }
+}
+```
 
 ## How to use it
 
@@ -28,25 +44,22 @@ First: export the environment variables with your credentials:
 ~/../native-lambda $ export LAMBDA_ROLE_ARN=arn:aws:iam::1234567890:role/lambda-test
 ```
 
-Second: build and tag the Dockerfile - it will install all dependencies, then compile and link the scala code as well
+Second: build and tag the Docker image - it will install all dependencies, then compile and link the scala code as well
 
 ```
-~/../native-lambda $ docker build -t native-lambda:latest .
+~/native-lambda $ ./build.sh
 ```
 
-Third: run the Dockerfile, which now contains your executable as well as the AWS CLI and helper scripts for performing the upload.  (use update.sh )
+Third: upload the code and the runtime to AWS lambda: 
 
 ```
-~/../native-lambda $ docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION -e LAMBDA_ROLE_ARN -it native-lambda:latest bash
-bash-4.2# ./init.sh
-# -- you should see the output with the layer and function entities here
-bash-4.2# ./invoke.sh '{"text":"some test data"}'
-{
-    "ExecutedVersion": "$LATEST", 
-    "StatusCode": 200
-}
-GOT REQUEST 2d87006b-f8a3-11e8-91f4-7578b1f37331 with event data: 
-Some(TestEvent(some test data))
+~/native-lambda $ ./deploy.sh
+```
+
+Fourth: invoke your lambda:
+
+```
+~/native-lambda $ ./invoke.sh '{"text":"some event text"}'
 ```
 
 Fourth: Check out the logs and metrics on the Lambda dashboard to see how it runs and what the performance is like.  I haven't done full load-testing yet,but from what I've seen cold starts are under 200ms, and a warmed executor serves most requests below the 100ms minimum billing increment. 
